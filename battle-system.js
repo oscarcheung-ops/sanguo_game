@@ -314,44 +314,40 @@ class Unit {
     }
 
     // 繪製單位
-    draw(canvas) {
+    draw(ctx) {
         const color = this.team === 0 ? COLORS.BLUE : COLORS.RED;
         
-        // 畫單位
-        canvas.create_oval(
-            this.pos[0] - 25, this.pos[1] - 25,
-            this.pos[0] + 25, this.pos[1] + 25,
-            { fill: color, outline: COLORS.WHITE, width: 2 }
-        );
+        // 畫單位圓形
+        ctx.beginPath();
+        ctx.arc(this.pos[0], this.pos[1], 25, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = COLORS.WHITE;
+        ctx.lineWidth = 2;
+        ctx.stroke();
         
         // 兵種圖標
         const unitIcons = { 0: "🔱", 1: "🐎", 2: "🏹" };
         const icon = unitIcons[this.type] || "⚔";
-        canvas.create_text(
-            this.pos[0], this.pos[1],
-            { text: icon, fill: COLORS.WHITE, font: ["Arial", 16] }
-        );
+        ctx.fillStyle = COLORS.WHITE;
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(icon, this.pos[0], this.pos[1]);
         
         // 血條背景
-        canvas.create_rectangle(
-            this.pos[0] - 25, this.pos[1] - 40,
-            this.pos[0] + 25, this.pos[1] - 32,
-            { fill: COLORS.RED, outline: COLORS.WHITE }
-        );
+        ctx.fillStyle = COLORS.RED;
+        ctx.fillRect(this.pos[0] - 25, this.pos[1] - 40, 50, 8);
         
         // 血條
         const hpWidth = 50 * (this.hp / this.maxHp);
-        canvas.create_rectangle(
-            this.pos[0] - 25, this.pos[1] - 40,
-            this.pos[0] - 25 + hpWidth, this.pos[1] - 32,
-            { fill: COLORS.GREEN, outline: COLORS.GREEN }
-        );
+        ctx.fillStyle = COLORS.GREEN;
+        ctx.fillRect(this.pos[0] - 25, this.pos[1] - 40, hpWidth, 8);
         
         // 名稱
-        canvas.create_text(
-            this.pos[0], this.pos[1] + 40,
-            { text: this.name, fill: COLORS.WHITE, font: ["Arial", 9] }
-        );
+        ctx.fillStyle = COLORS.WHITE;
+        ctx.font = '9px Arial';
+        ctx.fillText(this.name, this.pos[0], this.pos[1] + 40);
         
         // 狀態指示器
         let statusText = "";
@@ -366,10 +362,9 @@ class Unit {
         }
         
         if (statusText) {
-            canvas.create_text(
-                this.pos[0], this.pos[1] + 52,
-                { text: statusText, fill: statusColor, font: ["Arial", 8] }
-            );
+            ctx.fillStyle = statusColor;
+            ctx.font = '10px Arial';
+            ctx.fillText(statusText, this.pos[0], this.pos[1] + 52);
         }
         
         // 技能冷卻指示
@@ -377,29 +372,29 @@ class Unit {
             const cooldownPct = this.skillCooldown / this.skill.cooldown;
             const cooldownWidth = 50 * (1 - cooldownPct);
             
-            canvas.create_rectangle(
-                this.pos[0] - 25, this.pos[1] - 28,
-                this.pos[0] + 25, this.pos[1] - 24,
-                { fill: "#333", outline: "white", width: 1 }
-            );
-            canvas.create_rectangle(
-                this.pos[0] - 25, this.pos[1] - 28,
-                this.pos[0] - 25 + cooldownWidth, this.pos[1] - 24,
-                { fill: "#FF9900", outline: "" }
-            );
+            ctx.fillStyle = '#333';
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 1;
+            ctx.fillRect(this.pos[0] - 25, this.pos[1] - 28, 50, 4);
+            ctx.strokeRect(this.pos[0] - 25, this.pos[1] - 28, 50, 4);
+            
+            ctx.fillStyle = '#FF9900';
+            ctx.fillRect(this.pos[0] - 25, this.pos[1] - 28, cooldownWidth, 4);
         } else if (this.skill && this.skillReady) {
-            canvas.create_rectangle(
-                this.pos[0] - 25, this.pos[1] - 28,
-                this.pos[0] + 25, this.pos[1] - 24,
-                { fill: "#00FF00", outline: "#00FF00", width: 1 }
-            );
+            ctx.fillStyle = '#00FF00';
+            ctx.fillRect(this.pos[0] - 25, this.pos[1] - 28, 50, 4);
         }
         
         // 選中框
         if (this.selected) {
-            canvas.create_oval(
-                this.pos[0] - 30, this.pos[1] - 30,
-                this.pos[0] + 30, this.pos[1] + 30,
+            ctx.beginPath();
+            ctx.arc(this.pos[0], this.pos[1], 30, 0, Math.PI * 2);
+            ctx.strokeStyle = COLORS.YELLOW;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
+    }
+}
                 { outline: COLORS.YELLOW, width: 3 }
             );
         }
@@ -428,45 +423,40 @@ class Castle {
     }
 
     // 繪製城堡
-    draw(canvas) {
+    draw(ctx) {
         const color = this.isBoss ? COLORS.PURPLE : (this.team === 0 ? COLORS.GREEN : COLORS.RED);
         const icon = this.isBoss ? "👑" : "🏰";
         
         // 城堡主體
-        canvas.create_rectangle(
-            this.pos[0] - 60, this.pos[1] - 40,
-            this.pos[0] + 60, this.pos[1] + 40,
-            { fill: color, outline: COLORS.DARK_GOLD, width: 3 }
-        );
+        ctx.fillStyle = color;
+        ctx.strokeStyle = COLORS.YELLOW || '#F39C12';
+        ctx.lineWidth = 3;
+        ctx.fillRect(this.pos[0] - 60, this.pos[1] - 40, 120, 80);
+        ctx.strokeRect(this.pos[0] - 60, this.pos[1] - 40, 120, 80);
         
         // 城堡圖標
-        canvas.create_text(
-            this.pos[0], this.pos[1],
-            { text: icon, fill: COLORS.WHITE, font: ["Arial", 24] }
-        );
+        ctx.fillStyle = COLORS.WHITE;
+        ctx.font = '24px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(icon, this.pos[0], this.pos[1]);
         
         // 血條背景
-        canvas.create_rectangle(
-            this.pos[0] - 60, this.pos[1] - 50,
-            this.pos[0] + 60, this.pos[1] - 42,
-            { fill: COLORS.GRAY, outline: COLORS.WHITE, width: 2 }
-        );
+        ctx.fillStyle = '#2C3E50';
+        ctx.fillRect(this.pos[0] - 60, this.pos[1] - 55, 120, 8);
         
         // 血條
         const hpWidth = 120 * (this.hp / this.maxHp);
         const hpColor = this.hp > this.maxHp * 0.5 ? COLORS.GREEN :
                        this.hp > this.maxHp * 0.2 ? COLORS.YELLOW : COLORS.RED;
-        canvas.create_rectangle(
-            this.pos[0] - 60, this.pos[1] - 50,
-            this.pos[0] - 60 + hpWidth, this.pos[1] - 42,
-            { fill: hpColor }
-        );
+        ctx.fillStyle = hpColor;
+        ctx.fillRect(this.pos[0] - 60, this.pos[1] - 55, hpWidth, 8);
         
         // HP 文字
-        canvas.create_text(
-            this.pos[0], this.pos[1] - 52,
-            { text: `${Math.floor(this.hp)}/${Math.floor(this.maxHp)}`, fill: COLORS.WHITE, font: ["Arial", 10] }
-        );
+        ctx.fillStyle = COLORS.WHITE;
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${Math.floor(this.hp)}/${Math.floor(this.maxHp)}`, this.pos[0], this.pos[1] - 65);
     }
 }
 
@@ -490,12 +480,13 @@ class Particle {
     }
 
     // 繪製粒子
-    draw(canvas) {
+    draw(ctx) {
         const alpha = this.life / this.maxLife;
-        canvas.create_oval(
-            this.x - 3, this.y - 3,
-            this.x + 3, this.y + 3,
-            { fill: this.color, outline: this.color }
-        );
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.globalAlpha = alpha;
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
     }
 }

@@ -183,6 +183,11 @@ function startGame() {
         return;
     }
     
+    // 切換到遊戲畫面
+    document.getElementById('mainMenu').style.display = 'none';
+    document.getElementById('gameScreen').style.display = 'flex';
+    
+    // 現在畫面已顯示，設置 Canvas 大小
     resizeCanvas();
     
     // 初始化戰鬥配置
@@ -229,6 +234,9 @@ function startGame() {
     // 切換到遊戲畫面
     document.getElementById('mainMenu').style.display = 'none';
     document.getElementById('gameScreen').style.display = 'flex';
+    
+    // 現在畫面已顯示，設置 Canvas 大小
+    resizeCanvas();
     
     gameState.lastTime = Date.now();
     // 開始遊戲循環 (60 FPS)
