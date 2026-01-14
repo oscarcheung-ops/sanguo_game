@@ -2,6 +2,17 @@
 // 戰鬥系統 (Unit 類、城堡、粒子效果)
 // ============================================================
 
+// 顏色常數
+const COLORS = {
+    BLUE: '#4A90E2',
+    RED: '#E74C3C',
+    GREEN: '#2ECC71',
+    YELLOW: '#F39C12',
+    WHITE: '#FFFFFF',
+    CYAN: '#1ABC9C',
+    PURPLE: '#9B59B6'
+};
+
 // === Unit 類 (戰鬥單位) ===
 class Unit {
     constructor(name, x, y, team, unitType, hp = 100, atk = 20, speed = 3, siegeAtk = null) {
@@ -194,6 +205,37 @@ class Unit {
                 }
                 
                 return Math.floor(damage);
+            }
+        }
+        
+        // 攻城邏輯：當周圍沒有可攻擊的敵人時，優先攻擊城堡
+        if (castles && castles.length > 0) {
+            const attackRange = UNIT_ATTACK_RANGES[this.type];
+            // 檢查是否有敵人在攻擊範圍內
+            let hasEnemyInRange = false;
+            for (const enemy of units) {
+                if (enemy.team !== this.team && enemy.hp > 0) {
+                    if (Math.hypot(this.pos[0] - enemy.pos[0], this.pos[1] - enemy.pos[1]) < attackRange) {
+                        hasEnemyInRange = true;
+                        break;
+                    }
+                }
+            }
+            
+            // 沒有敵人在範圍內，攻擊敵方城堡
+            if (!hasEnemyInRange) {
+                const enemyCastle = this.team === 0 ? castles[1] : castles[0];
+                if (enemyCastle && Math.hypot(this.pos[0] - enemyCastle.pos[0], this.pos[1] - enemyCastle.pos[1]) < attackRange) {
+                    const damage = Math.floor(this.siegeAtk || this.atk);
+                    enemyCastle.hp -= damage;
+                    
+                    if (gameWindow) {
+                        gameWindow.damageTexts.push([enemyCastle.pos.slice(), damage, 30]);
+                        gameWindow.particles.push(new Particle(enemyCastle.pos[0], enemyCastle.pos[1], COLORS.RED, 0.8, 0, -30));
+                    }
+                    
+                    return damage;
+                }
             }
         }
         

@@ -108,6 +108,16 @@ function gameLoop(currentTime) {
         ctx.fillText(text[1], text[0][0], text[0][1] - 10 * (1 - alpha));
     });
     
+    // 自動戰鬥邏輯：玩家單位自動向敵方城堡方向移動
+    if (gameState.autoMode) {
+        gameState.units.forEach(unit => {
+            if (unit.team === 0 && unit.hp > 0 && !unit.targetPos) {
+                // 向敵方城堡方向移動
+                unit.targetPos = [gameState.enemyCastle.pos[0], gameState.enemyCastle.pos[1] + 80];
+            }
+        });
+    }
+    
     // 敵人生成邏輯
     if (gameState.units.filter(u => u.team === 1).length < 8) {
         // 根據波數增加敵人數量
@@ -221,7 +231,12 @@ function startGame() {
     document.getElementById('gameScreen').style.display = 'flex';
     
     gameState.lastTime = Date.now();
-    requestAnimationFrame(gameLoop);
+    // 開始遊戲循環 (60 FPS)
+    setInterval(() => {
+        if (gameState.running) {
+            gameLoop(Date.now());
+        }
+    }, 16);
 }
 
 // === 遊戲結束 ===
