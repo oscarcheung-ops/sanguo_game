@@ -274,6 +274,7 @@ function backToMenu() {
     gameState.running = false;
     document.getElementById('gameScreen').style.display = 'none';
     document.getElementById('mainMenu').style.display = 'flex';
+    updateMenuResources();
 }
 
 // === 控制功能 ===
@@ -306,13 +307,18 @@ function showTeam() {
         return;
     }
     
-    const cardListText = roster.map((card, i) =>
-        `${i + 1}. ${card.name} Lv${card.level} ${card.stars}⭐ (${card.rarity})`
-    ).join('\n');
+    const cardListText = roster.map((card, i) => {
+        const stats = card.stats();
+        const typeIcon = { 0: '🔱槍', 1: '🐎騎', 2: '🏹弓' }[card.unitType];
+        return `${i + 1}. ${card.name} ${typeIcon} Lv${card.level} ${card.stars}⭐ (${card.rarity})\n   HP:${Math.floor(stats.maxHp)} ATK:${Math.floor(stats.atk)} SPD:${stats.speed.toFixed(1)}`;
+    }).join('\n\n');
     
-    const currentTeam = player.getTeamCards().map(c => c.name).join(', ') || '(空)';
+    const currentTeam = player.getTeamCards();
+    const teamText = currentTeam.length > 0 
+        ? currentTeam.map((c, i) => `${i + 1}. ${c.name} Lv${c.level}`).join('\n') 
+        : '(空)';
     
-    alert(`📚 英雄圖鑑：\n${cardListText}\n\n當前隊伍：${currentTeam}`);
+    alert(`📚 英雄圖鑑 (${roster.length}名)：\n\n${cardListText}\n\n━━━━━━━━━━━━━━━━━━\n⚔️ 當前隊伍：\n${teamText}\n\n💡 提示：隊伍自動選擇前3名英雄`);
 }
 
 // === 抽卡功能 ===
@@ -339,6 +345,7 @@ function showGacha() {
         .join('\n');
     
     alert(`🎁 抽卡結果：\n${resultText}\n\n當前鑽石: ${player.gems}`);
+    updateMenuResources();
 }
 
 // === 任務系統 ===
@@ -362,9 +369,23 @@ window.addEventListener('DOMContentLoaded', () => {
         player.team = results.slice(0, 3).map(r => r.id);
         player.save();
         
-        alert(`🎬 歡迎遊戲！\n\n首次 10 連抽結果：\n${results.map(r => r.name).join('\n')}`);
+        const heroList = results.map((r, i) => `${i + 1}. ${r.name} (${r.rarity})`).join('\n');
+        alert(`🎉 歡迎來到三國戰記！\n\n🎁 新手禮包：免費 10 連抽\n\n獲得英雄：\n${heroList}\n\n✅ 已自動組建隊伍（前3名英雄）\n\n💡 點擊「開始遊戲」開始戰鬥！`);
     }
     
     console.log('✅ 遊戲已加載完成');
-    console.log('玩家數據:', player);
+    console.log('💰 金幣:', player.gold, '💎 鑽石:', player.gems);
+    console.log('🎴 擁有英雄:', player.roster.length, '名');
+    console.log('⚔️ 當前隊伍:', player.getTeamCards().map(c => c.name).join(', '));
+    
+    // 更新主菜單資源顯示
+    updateMenuResources();
 });
+
+// 更新主菜單資源顯示
+function updateMenuResources() {
+    const goldElem = document.getElementById('menuGold');
+    const gemsElem = document.getElementById('menuGems');
+    if (goldElem) goldElem.textContent = `💰 金幣: ${player.gold}`;
+    if (gemsElem) gemsElem.textContent = `💎 鑽石: ${player.gems}`;
+}
