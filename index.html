@@ -164,7 +164,10 @@
 <body>
     <div id="gameContainer">
         <div id="startScreen">
-            <h1>🎮 三國戰記</h1>
+            <h1>🎮 三國戰記 - 簡化版</h1>
+            <p style="margin-bottom: 20px; color: #F39C12;">
+                <a href="index-full.html" style="color: #4A90E2; text-decoration: underline;">→ 點擊玩完整版</a>
+            </p>
             <div class="tutorial">
                 <h2>遊戲規則：</h2>
                 <ul>
@@ -216,8 +219,8 @@
             <button class="control-btn archer" onclick="spawnUnit(2)">
                 弓兵<br>💰55
             </button>
-            <button class="control-btn upgrade" onclick="showUpgradeMenu()">
-                升級<br>💰100
+            <button class="control-btn upgrade" onclick="location.href='index-full.html'">
+                完整版<br>🎮
             </button>
             <button class="control-btn auto" id="autoBtn" onclick="toggleAuto()">
                 自動<br>關閉
