@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>三國戰記 - 手機版</title>
+    <title>三國戰記 - 完整版</title>
     <style>
         * {
             margin: 0;
@@ -13,10 +13,11 @@
         }
 
         body {
-            background: linear-gradient(135deg, #1A1A2E 0%, #2C3E50 100%);
+            background: linear-gradient(135deg, #0F1419 0%, #1A1A2E 100%);
             font-family: 'Microsoft JhengHei', Arial, sans-serif;
             overflow: hidden;
             touch-action: none;
+            color: #ECF0F1;
         }
 
         #gameContainer {
@@ -27,18 +28,78 @@
             flex-direction: column;
         }
 
-        #topBar {
-            background: rgba(26, 26, 46, 0.95);
-            color: #ECF0F1;
-            padding: 10px;
+        /* === 主選單 === */
+        #mainMenu {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0F1419 0%, #2C3E50 100%);
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
+            justify-content: center;
             align-items: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            z-index: 100;
+            z-index: 1000;
         }
 
-        .stat {
+        .menu-title {
+            font-size: 48px;
+            margin-bottom: 40px;
+            color: #F39C12;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.8);
+            font-weight: bold;
+        }
+
+        .menu-subtitle {
+            font-size: 16px;
+            margin-bottom: 30px;
+            color: #BDC3C7;
+        }
+
+        .menu-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 200px);
+            gap: 15px;
+        }
+
+        .menu-btn {
+            background: linear-gradient(145deg, #4A90E2, #357ABD);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 20px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        .menu-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+        }
+
+        .menu-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* === 遊戲畫面 === */
+        #gameScreen {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+        }
+
+        #topBar {
+            background: rgba(26, 26, 46, 0.95);
+            padding: 10px 15px;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        .stat-box {
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -53,14 +114,13 @@
 
         #gameCanvas {
             flex: 1;
-            background: linear-gradient(180deg, #2C3E50 0%, #34495E 50%, #1A1A2E 100%);
+            background: linear-gradient(180deg, #0F1419 0%, #1A1A2E 50%, #0F1419 100%);
             display: block;
-            touch-action: none;
         }
 
-        #controls {
+        #gameControls {
             background: rgba(26, 26, 46, 0.95);
-            padding: 15px;
+            padding: 10px;
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 10px;
@@ -71,166 +131,103 @@
             background: linear-gradient(145deg, #4A90E2, #357ABD);
             color: white;
             border: none;
-            border-radius: 10px;
-            padding: 15px 10px;
-            font-size: 14px;
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 12px;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.2s;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            touch-action: manipulation;
         }
 
         .control-btn:active {
             transform: scale(0.95);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }
 
-        .control-btn.spear { background: linear-gradient(145deg, #E74C3C, #C0392B); }
-        .control-btn.cavalry { background: linear-gradient(145deg, #F39C12, #D68910); }
-        .control-btn.archer { background: linear-gradient(145deg, #2ECC71, #27AE60); }
-        .control-btn.upgrade { background: linear-gradient(145deg, #9B59B6, #8E44AD); }
-        .control-btn.auto { background: linear-gradient(145deg, #1ABC9C, #16A085); }
-
-        .control-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        #startScreen, #gameOverScreen {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(26, 26, 46, 0.98);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            color: #ECF0F1;
-        }
-
-        h1 {
-            font-size: 36px;
-            margin-bottom: 20px;
-            color: #F39C12;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-        }
-
-        .start-btn, .restart-btn {
+        .control-btn.back {
             background: linear-gradient(145deg, #E74C3C, #C0392B);
-            color: white;
-            border: none;
-            border-radius: 15px;
-            padding: 20px 40px;
-            font-size: 24px;
-            font-weight: bold;
-            cursor: pointer;
-            margin: 10px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            transition: all 0.2s;
-        }
-
-        .start-btn:active, .restart-btn:active {
-            transform: scale(0.95);
         }
 
         .hidden {
             display: none !important;
         }
 
-        .tutorial {
-            max-width: 90%;
-            background: rgba(44, 62, 80, 0.9);
-            padding: 20px;
-            border-radius: 10px;
-            margin-top: 20px;
-            text-align: left;
-        }
+        @media (max-width: 768px) {
+            .menu-buttons {
+                grid-template-columns: 1fr;
+                width: 90%;
+                max-width: 300px;
+            }
 
-        .tutorial h2 {
-            color: #F39C12;
-            margin-bottom: 10px;
-        }
+            .menu-title {
+                font-size: 36px;
+            }
 
-        .tutorial ul {
-            list-style-position: inside;
-            line-height: 1.6;
+            #topBar {
+                grid-template-columns: repeat(2, 1fr);
+                font-size: 11px;
+            }
+
+            .stat-value {
+                font-size: 14px;
+            }
+
+            #gameControls {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
     </style>
 </head>
 <body>
     <div id="gameContainer">
-        <div id="startScreen">
-            <h1>🎮 三國戰記 - 簡化版</h1>
-            <p style="margin-bottom: 20px; color: #F39C12;">
-                <a href="index-full.html" style="color: #4A90E2; text-decoration: underline;">→ 點擊玩完整版</a>
-            </p>
-            <div class="tutorial">
-                <h2>遊戲規則：</h2>
-                <ul>
-                    <li>🏰 摧毀敵方城堡獲勝</li>
-                    <li>⚔️ 點擊按鈕召喚兵種（槍、騎、弓）</li>
-                    <li>🔄 兵種相剋：槍克騎、騎克弓、弓克槍</li>
-                    <li>💰 擊殺敵人獲得金幣</li>
-                    <li>📈 使用金幣升級屬性</li>
-                    <li>🤖 自動戰鬥模式自動召喚兵種</li>
-                </ul>
-            </div>
-            <button class="start-btn" onclick="startGame()">開始遊戲</button>
-        </div>
-
-        <div id="gameOverScreen" class="hidden">
-            <h1 id="gameOverTitle">遊戲結束</h1>
-            <p id="gameOverStats" style="font-size: 18px; margin: 20px 0;"></p>
-            <button class="restart-btn" onclick="location.reload()">重新開始</button>
-        </div>
-
-        <div id="topBar">
-            <div class="stat">
-                <span>金幣</span>
-                <span class="stat-value" id="gold">100</span>
-            </div>
-            <div class="stat">
-                <span>玩家城堡</span>
-                <span class="stat-value" id="playerHP">1000</span>
-            </div>
-            <div class="stat">
-                <span>關卡</span>
-                <span class="stat-value" id="level">1</span>
-            </div>
-            <div class="stat">
-                <span>敵方城堡</span>
-                <span class="stat-value" id="enemyHP">1000</span>
+        <!-- 主選單 -->
+        <div id="mainMenu">
+            <div class="menu-title">🎮 三國戰記</div>
+            <div class="menu-subtitle">完整版 - 還原原遊戲</div>
+            <div class="menu-buttons">
+                <button class="menu-btn" onclick="startGame()">開始遊戲</button>
+                <button class="menu-btn" onclick="showTeam()">隊伍編成</button>
+                <button class="menu-btn" onclick="showGacha()">抽卡獲取</button>
+                <button class="menu-btn" onclick="showQuests()">任務中心</button>
             </div>
         </div>
 
-        <canvas id="gameCanvas"></canvas>
-
-        <div id="controls">
-            <button class="control-btn spear" onclick="spawnUnit(0)">
-                槍兵<br>💰50
-            </button>
-            <button class="control-btn cavalry" onclick="spawnUnit(1)">
-                騎兵<br>💰60
-            </button>
-            <button class="control-btn archer" onclick="spawnUnit(2)">
-                弓兵<br>💰55
-            </button>
-            <button class="control-btn upgrade" onclick="location.href='index-full.html'">
-                完整版<br>🎮
-            </button>
-            <button class="control-btn auto" id="autoBtn" onclick="toggleAuto()">
-                自動<br>關閉
-            </button>
-            <button class="control-btn" onclick="nextWave()">
-                下一波<br>⏭️
-            </button>
+        <!-- 遊戲畫面 -->
+        <div id="gameScreen">
+            <div id="topBar">
+                <div class="stat-box">
+                    <span>玩家城堡</span>
+                    <span class="stat-value" id="playerHP">0</span>
+                </div>
+                <div class="stat-box">
+                    <span>敵方城堡</span>
+                    <span class="stat-value" id="enemyHP">0</span>
+                </div>
+                <div class="stat-box">
+                    <span>波數</span>
+                    <span class="stat-value" id="waveNum">1/10</span>
+                </div>
+                <div class="stat-box">
+                    <span>金幣</span>
+                    <span class="stat-value" id="gold">0</span>
+                </div>
+                <div class="stat-box">
+                    <span>時間</span>
+                    <span class="stat-value" id="timer">0:00</span>
+                </div>
+            </div>
+            <canvas id="gameCanvas"></canvas>
+            <div id="gameControls">
+                <button class="control-btn" onclick="toggleAuto()">🤖 自動戰鬥</button>
+                <button class="control-btn" onclick="changeSpeed()">⏱️ 1.0x</button>
+                <button class="control-btn back" onclick="backToMenu()">← 返回</button>
+            </div>
         </div>
     </div>
 
+    <!-- JavaScript 庫文件（按順序加載） -->
+    <script src="config.js"></script>
+    <script src="card-system.js"></script>
+    <script src="battle-system.js"></script>
     <script src="game.js"></script>
 </body>
 </html>

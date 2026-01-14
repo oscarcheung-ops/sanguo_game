@@ -1,404 +1,76 @@
-// 遊戲配置
-const CONFIG = {
-    UNIT_COSTS: { 0: 50, 1: 60, 2: 55 }, // 槍、騎、弓
-    UNIT_NAMES: { 0: '槍兵', 1: '騎兵', 2: '弓兵' },
-    UNIT_COLORS: { 0: '#E74C3C', 1: '#F39C12', 2: '#2ECC71' },
-    UNIT_ATTACK_RANGES: { 0: 60, 1: 50, 2: 120 },
-    UPGRADE_COST: 100,
-    GOLD_PER_KILL: 30,
-    INITIAL_GOLD: 100
-};
+// ============================================================
+// 遊戲主邏輯 - game.js
+// 核心遊戲循環、UI 更新、遊戲控制
+// ============================================================
 
-// 遊戲狀態
+// === 全局遊戲狀態 ===
 let gameState = {
-    gold: CONFIG.INITIAL_GOLD,
-    level: 1,
     playerCastle: null,
     enemyCastle: null,
     units: [],
+    wave: 1,
+    maxWaves: 8,
     running: false,
     autoMode: false,
-    autoTimer: 0,
-    playerStats: {
-        atkBonus: 1.0,
-        hpBonus: 1.0,
-        speedBonus: 1.0
-    }
+    gameSpeed: 1.0,
+    startTime: 0,
+    lastTime: 0,
+    damageTexts: [],
+    particles: []
 };
 
 // Canvas 設置
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+// 根據窗口大小調整 canvas
 function resizeCanvas() {
-    const container = document.getElementById('gameContainer');
+    const gameScreen = document.getElementById('gameScreen');
     const topBar = document.getElementById('topBar');
-    const controls = document.getElementById('controls');
-    const availableHeight = window.innerHeight - topBar.offsetHeight - controls.offsetHeight;
+    const controls = document.getElementById('gameControls');
     
-    canvas.width = window.innerWidth;
-    canvas.height = availableHeight;
+    if (gameScreen && gameScreen.style.display !== 'none') {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight - (topBar?.offsetHeight || 0) - (controls?.offsetHeight || 0);
+    }
 }
 
 window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
 
-// 兵種相剋
-function getMultiplier(attacker, defender) {
-    if ((attacker === 0 && defender === 1) || 
-        (attacker === 1 && defender === 2) || 
-        (attacker === 2 && defender === 0)) {
-        return 1.2;
-    }
-    return 1.0;
-}
-
-// 城堡類
-class Castle {
-    constructor(x, y, team) {
-        this.x = x;
-        this.y = y;
-        this.team = team; // 0=玩家, 1=敵人
-        this.maxHp = 1000;
-        this.hp = 1000;
-        this.width = 80;
-        this.height = 60;
-    }
-
-    takeDamage(damage) {
-        this.hp = Math.max(0, this.hp - damage);
-        if (this.hp <= 0) {
-            gameOver(this.team === 1);
-        }
-    }
-
-    draw() {
-        const color = this.team === 0 ? '#4A90E2' : '#E74C3C';
-        
-        // 城堡主體
-        ctx.fillStyle = color;
-        ctx.fillRect(this.x - this.width/2, this.y - this.height/2, this.width, this.height);
-        
-        // 城堡細節
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(this.x - this.width/2, this.y - this.height/2, this.width, this.height);
-        
-        // 旗幟
-        ctx.fillStyle = this.team === 0 ? '#2ECC71' : '#9B59B6';
-        ctx.beginPath();
-        ctx.moveTo(this.x, this.y - this.height/2);
-        ctx.lineTo(this.x, this.y - this.height/2 - 30);
-        ctx.lineTo(this.x + 20, this.y - this.height/2 - 20);
-        ctx.lineTo(this.x, this.y - this.height/2 - 10);
-        ctx.fill();
-        ctx.stroke();
-        
-        // HP 條
-        const barWidth = this.width;
-        const barHeight = 8;
-        const hpPercent = this.hp / this.maxHp;
-        
-        ctx.fillStyle = '#000';
-        ctx.fillRect(this.x - barWidth/2, this.y + this.height/2 + 5, barWidth, barHeight);
-        
-        ctx.fillStyle = hpPercent > 0.5 ? '#2ECC71' : hpPercent > 0.25 ? '#F39C12' : '#E74C3C';
-        ctx.fillRect(this.x - barWidth/2, this.y + this.height/2 + 5, barWidth * hpPercent, barHeight);
-        
-        // HP 文字
-        ctx.fillStyle = '#FFF';
-        ctx.font = 'bold 12px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(Math.floor(this.hp), this.x, this.y);
-    }
-}
-
-// 單位類
-class Unit {
-    constructor(x, y, team, type) {
-        this.x = x;
-        this.y = y;
-        this.team = team;
-        this.type = type; // 0=槍, 1=騎, 2=弓
-        
-        const baseHp = type === 1 ? 80 : type === 2 ? 70 : 100;
-        const baseAtk = type === 1 ? 25 : type === 2 ? 18 : 20;
-        const baseSpeed = type === 1 ? 4 : type === 2 ? 2.5 : 3;
-        
-        if (team === 0) {
-            this.maxHp = baseHp * gameState.playerStats.hpBonus;
-            this.hp = this.maxHp;
-            this.atk = baseAtk * gameState.playerStats.atkBonus;
-            this.speed = baseSpeed * gameState.playerStats.speedBonus;
-        } else {
-            this.maxHp = baseHp * (1 + gameState.level * 0.1);
-            this.hp = this.maxHp;
-            this.atk = baseAtk * (1 + gameState.level * 0.1);
-            this.speed = baseSpeed;
-        }
-        
-        this.target = null;
-        this.attackCooldown = 0;
-        this.radius = 8;
-    }
-
-    update(deltaTime) {
-        if (this.attackCooldown > 0) {
-            this.attackCooldown -= deltaTime;
-        }
-
-        // 尋找目標
-        if (!this.target || this.target.hp <= 0) {
-            this.findTarget();
-        }
-
-        // 移動和攻擊
-        if (this.target) {
-            const dx = this.target.x - this.x;
-            const dy = this.target.y - this.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            const attackRange = CONFIG.UNIT_ATTACK_RANGES[this.type];
-
-            if (dist > attackRange) {
-                // 移動向目標
-                const moveX = (dx / dist) * this.speed;
-                const moveY = (dy / dist) * this.speed;
-                this.x += moveX;
-                this.y += moveY;
-                
-                // 限制在場地內
-                this.x = Math.max(20, Math.min(canvas.width - 20, this.x));
-                this.y = Math.max(20, Math.min(canvas.height - 20, this.y));
-            } else {
-                // 攻擊
-                if (this.attackCooldown <= 0) {
-                    this.attack(this.target);
-                    this.attackCooldown = 1000; // 1秒攻擊間隔
-                }
-            }
-        }
-    }
-
-    findTarget() {
-        // 優先攻擊敵方單位，其次攻擊城堡
-        const enemies = gameState.units.filter(u => u.team !== this.team && u.hp > 0);
-        
-        if (enemies.length > 0) {
-            this.target = enemies.reduce((closest, u) => {
-                const dist = Math.sqrt((u.x - this.x) ** 2 + (u.y - this.y) ** 2);
-                const closestDist = Math.sqrt((closest.x - this.x) ** 2 + (closest.y - this.y) ** 2);
-                return dist < closestDist ? u : closest;
-            });
-        } else {
-            // 攻擊敵方城堡
-            this.target = this.team === 0 ? gameState.enemyCastle : gameState.playerCastle;
-        }
-    }
-
-    attack(target) {
-        let damage = this.atk;
-        
-        if (target instanceof Unit) {
-            damage *= getMultiplier(this.type, target.type);
-        }
-        
-        target.takeDamage(damage);
-        
-        // 視覺效果 - 攻擊線
-        if (target instanceof Unit || target instanceof Castle) {
-            ctx.strokeStyle = CONFIG.UNIT_COLORS[this.type];
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(this.x, this.y);
-            ctx.lineTo(target.x, target.y);
-            ctx.stroke();
-        }
-    }
-
-    takeDamage(damage) {
-        this.hp = Math.max(0, this.hp - damage);
-        
-        if (this.hp <= 0) {
-            // 給予金幣獎勵（只有擊殺敵人時）
-            if (this.team === 1) {
-                gameState.gold += CONFIG.GOLD_PER_KILL;
-                updateUI();
-            }
-        }
-    }
-
-    draw() {
-        if (this.hp <= 0) return;
-        
-        // 單位圓形
-        ctx.fillStyle = CONFIG.UNIT_COLORS[this.type];
-        if (this.team === 1) {
-            ctx.globalAlpha = 0.7; // 敵人略透明
-        }
-        
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        
-        ctx.globalAlpha = 1.0;
-        
-        // 類型標記
-        ctx.fillStyle = '#FFF';
-        ctx.font = 'bold 10px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        const icon = this.type === 0 ? '槍' : this.type === 1 ? '騎' : '弓';
-        ctx.fillText(icon, this.x, this.y);
-        
-        // HP 條
-        const barWidth = this.radius * 2.5;
-        const barHeight = 4;
-        const hpPercent = this.hp / this.maxHp;
-        
-        ctx.fillStyle = '#000';
-        ctx.fillRect(this.x - barWidth/2, this.y - this.radius - 8, barWidth, barHeight);
-        
-        ctx.fillStyle = hpPercent > 0.5 ? '#2ECC71' : hpPercent > 0.25 ? '#F39C12' : '#E74C3C';
-        ctx.fillRect(this.x - barWidth/2, this.y - this.radius - 8, barWidth * hpPercent, barHeight);
-    }
-}
-
-// 召喚單位
-function spawnUnit(type) {
-    const cost = CONFIG.UNIT_COSTS[type];
-    
-    if (gameState.gold < cost) {
-        return;
-    }
-    
-    gameState.gold -= cost;
-    
-    // 在玩家城堡附近隨機位置生成
-    const x = gameState.playerCastle.x + (Math.random() - 0.5) * 100;
-    const y = gameState.playerCastle.y + (Math.random() - 0.5) * 80;
-    
-    const unit = new Unit(x, y, 0, type);
-    gameState.units.push(unit);
-    
-    updateUI();
-}
-
-// 生成敵方單位
-function spawnEnemyUnit() {
-    const types = [0, 1, 2];
-    const type = types[Math.floor(Math.random() * types.length)];
-    
-    const x = gameState.enemyCastle.x + (Math.random() - 0.5) * 100;
-    const y = gameState.enemyCastle.y + (Math.random() - 0.5) * 80;
-    
-    const unit = new Unit(x, y, 1, type);
-    gameState.units.push(unit);
-}
-
-// 升級菜單
-function showUpgradeMenu() {
-    if (gameState.gold < CONFIG.UPGRADE_COST) {
-        return;
-    }
-    
-    const options = [
-        '攻擊力 +20%',
-        '生命值 +20%',
-        '移動速度 +20%'
-    ];
-    
-    const choice = confirm(`選擇升級 (💰${CONFIG.UPGRADE_COST}):\n1. ${options[0]}\n2. ${options[1]}\n3. ${options[2]}\n\n點擊確定升級攻擊力，取消可選其他`);
-    
-    gameState.gold -= CONFIG.UPGRADE_COST;
-    
-    if (choice) {
-        gameState.playerStats.atkBonus *= 1.2;
-    } else {
-        const choice2 = confirm('升級生命值？(確定=生命值，取消=速度)');
-        if (choice2) {
-            gameState.playerStats.hpBonus *= 1.2;
-        } else {
-            gameState.playerStats.speedBonus *= 1.2;
-        }
-    }
-    
-    updateUI();
-}
-
-// 自動模式
-function toggleAuto() {
-    gameState.autoMode = !gameState.autoMode;
-    const btn = document.getElementById('autoBtn');
-    btn.innerHTML = gameState.autoMode ? '自動<br>開啟' : '自動<br>關閉';
-    btn.style.background = gameState.autoMode ? 
-        'linear-gradient(145deg, #27AE60, #1E8449)' : 
-        'linear-gradient(145deg, #1ABC9C, #16A085)';
-}
-
-// 下一波
-function nextWave() {
-    gameState.level++;
-    gameState.gold += 50;
-    
-    // 重置敵方城堡
-    gameState.enemyCastle.hp = gameState.enemyCastle.maxHp * (1 + gameState.level * 0.1);
-    gameState.enemyCastle.maxHp = gameState.enemyCastle.hp;
-    
-    // 清除所有敵方單位
-    gameState.units = gameState.units.filter(u => u.team === 0);
-    
-    updateUI();
-}
-
-// 更新 UI
+// === UI 更新函數 ===
 function updateUI() {
-    document.getElementById('gold').textContent = Math.floor(gameState.gold);
-    document.getElementById('level').textContent = gameState.level;
-    document.getElementById('playerHP').textContent = Math.floor(gameState.playerCastle.hp);
-    document.getElementById('enemyHP').textContent = Math.floor(gameState.enemyCastle.hp);
-}
-
-// 遊戲結束
-function gameOver(victory) {
-    gameState.running = false;
+    const playerHPElem = document.getElementById('playerHP');
+    const enemyHPElem = document.getElementById('enemyHP');
+    const waveNumElem = document.getElementById('waveNum');
+    const goldElem = document.getElementById('gold');
+    const timerElem = document.getElementById('timer');
     
-    const screen = document.getElementById('gameOverScreen');
-    const title = document.getElementById('gameOverTitle');
-    const stats = document.getElementById('gameOverStats');
+    if (playerHPElem) playerHPElem.textContent = Math.max(0, Math.floor(gameState.playerCastle.hp));
+    if (enemyHPElem) enemyHPElem.textContent = Math.max(0, Math.floor(gameState.enemyCastle.hp));
+    if (waveNumElem) waveNumElem.textContent = `${gameState.wave}/${gameState.maxWaves}`;
+    if (goldElem) goldElem.textContent = player.gold;
     
-    if (victory) {
-        title.textContent = '🎉 勝利！';
-        title.style.color = '#2ECC71';
-        stats.textContent = `完成關卡：${gameState.level}\n獲得金幣：${Math.floor(gameState.gold)}`;
-    } else {
-        title.textContent = '💀 失敗';
-        title.style.color = '#E74C3C';
-        stats.textContent = `堅持到關卡：${gameState.level}`;
+    if (timerElem) {
+        const elapsed = (Date.now() - gameState.startTime) / 1000;
+        const mins = Math.floor(elapsed / 60);
+        const secs = Math.floor(elapsed % 60);
+        timerElem.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
     }
-    
-    screen.classList.remove('hidden');
 }
 
-// 遊戲循環
-let lastTime = 0;
-let enemySpawnTimer = 0;
-
+// === 主遊戲循環 ===
 function gameLoop(currentTime) {
     if (!gameState.running) return;
     
-    const deltaTime = currentTime - lastTime;
-    lastTime = currentTime;
+    const deltaTime = Math.min((currentTime - gameState.lastTime) / 1000, 0.016) * gameState.gameSpeed;
+    gameState.lastTime = currentTime;
     
     // 清空畫布
-    ctx.fillStyle = 'rgba(44, 62, 80, 0.3)';
+    ctx.fillStyle = 'rgba(15, 20, 25, 0.5)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // 繪製中線
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    // 繪製中線分割區域
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
     ctx.lineWidth = 2;
     ctx.setLineDash([10, 10]);
     ctx.beginPath();
@@ -408,60 +80,268 @@ function gameLoop(currentTime) {
     ctx.setLineDash([]);
     
     // 更新和繪製城堡
-    gameState.playerCastle.draw();
-    gameState.enemyCastle.draw();
+    if (gameState.playerCastle) gameState.playerCastle.draw(ctx);
+    if (gameState.enemyCastle) gameState.enemyCastle.draw(ctx);
     
     // 更新和繪製單位
     gameState.units = gameState.units.filter(u => u.hp > 0);
     gameState.units.forEach(unit => {
-        unit.update(deltaTime);
-        unit.draw();
+        unit.update(gameState.units, gameState);
+        unit.draw(ctx);
+    });
+    
+    // 更新粒子效果
+    gameState.particles = gameState.particles.filter(p => p.life > 0);
+    gameState.particles.forEach(p => {
+        p.update(deltaTime);
+        p.draw(ctx);
+    });
+    
+    // 更新傷害文字浮動
+    gameState.damageTexts = gameState.damageTexts.filter(([_, __, life]) => life > 0);
+    gameState.damageTexts.forEach(text => {
+        text[2]--;
+        const alpha = text[2] / 60;
+        ctx.fillStyle = `rgba(255, 100, 100, ${alpha})`;
+        ctx.font = 'bold 18px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(text[1], text[0][0], text[0][1] - 10 * (1 - alpha));
     });
     
     // 敵人生成邏輯
-    enemySpawnTimer += deltaTime;
-    const spawnInterval = Math.max(2000, 5000 - gameState.level * 200);
-    if (enemySpawnTimer > spawnInterval) {
-        spawnEnemyUnit();
-        enemySpawnTimer = 0;
+    if (gameState.units.filter(u => u.team === 1).length < 8) {
+        // 根據波數增加敵人數量
+        const enemyLimit = Math.min(3 + gameState.wave, 8);
+        if (gameState.units.filter(u => u.team === 1).length < enemyLimit && Math.random() < 0.02) {
+            spawnEnemyUnit();
+        }
     }
     
-    // 自動模式
-    if (gameState.autoMode) {
-        gameState.autoTimer += deltaTime;
-        if (gameState.autoTimer > 1500) {
-            const types = [0, 1, 2];
-            const type = types[Math.floor(Math.random() * types.length)];
-            if (gameState.gold >= CONFIG.UNIT_COSTS[type]) {
-                spawnUnit(type);
-            }
-            gameState.autoTimer = 0;
-        }
+    // 檢查波數完成
+    if (gameState.wave <= gameState.maxWaves && 
+        gameState.units.filter(u => u.team === 1).length === 0 &&
+        gameState.units.filter(u => u.team === 0).length > 0) {
+        gameState.wave++;
+    }
+    
+    // 檢查遊戲結束
+    if (gameState.playerCastle.hp <= 0) {
+        endGame(false);
+        return;
+    }
+    if (gameState.wave > gameState.maxWaves && gameState.units.filter(u => u.team === 1).length === 0) {
+        // 所有波次完成
+        endGame(true);
+        return;
     }
     
     updateUI();
     requestAnimationFrame(gameLoop);
 }
 
-// 開始遊戲
+// === 生成敵人單位 ===
+function spawnEnemyUnit() {
+    const heroData = HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
+    
+    // 根據波數計算敵人屬性倍數
+    const levelMult = 1 + (gameState.wave - 1) * 0.15;
+    const hp = Math.floor(heroData.base_hp * levelMult);
+    const atk = Math.floor(heroData.base_atk * levelMult);
+    const speed = heroData.base_speed * levelMult;
+    
+    // 隨機生成位置（敵人上方）
+    const x = canvas.width / 2 + (Math.random() - 0.5) * 400;
+    const y = 80 + Math.random() * 80;
+    
+    const unit = new Unit(
+        `敵-${heroData.name}`,
+        x, y,
+        1, // team = 1（敵方）
+        heroData.type,
+        hp, atk, speed
+    );
+    
+    gameState.units.push(unit);
+}
+
+// === 開始遊戲 ===
 function startGame() {
-    document.getElementById('startScreen').classList.add('hidden');
+    const teamCards = player.getTeamCards();
     
-    // 初始化城堡
-    gameState.playerCastle = new Castle(canvas.width / 2, canvas.height - 80, 0);
-    gameState.enemyCastle = new Castle(canvas.width / 2, 80, 1);
+    if (teamCards.length === 0) {
+        alert('❌ 請先組建隊伍！(需要 3 名英雄)');
+        return;
+    }
     
+    resizeCanvas();
+    
+    // 初始化戰鬥配置
+    const chapterIdx = Math.max(0, Math.min(player.currentChapter - 1, 2));
+    const chapter = CHAPTER_CONFIGS[chapterIdx];
+    
+    gameState.maxWaves = chapter.waves;
+    gameState.playerCastle = new Castle(canvas.width / 2, canvas.height - 120, 0);
+    gameState.enemyCastle = new Castle(canvas.width / 2, 80, 1, chapter.has_boss);
+    gameState.units = [];
+    gameState.wave = 1;
     gameState.running = true;
-    lastTime = performance.now();
+    gameState.autoMode = false;
+    gameState.gameSpeed = 1.0;
+    gameState.startTime = Date.now();
+    gameState.lastTime = Date.now();
+    gameState.damageTexts = [];
+    gameState.particles = [];
+    
+    // 創建玩家單位（隊伍中的英雄）
+    teamCards.forEach((card, idx) => {
+        const { maxHp, atk, speed } = card.stats();
+        
+        // 按陣容排列
+        const spacing = 180;
+        const centerX = canvas.width / 2;
+        const x = centerX - spacing + idx * spacing;
+        const y = canvas.height - 180;
+        
+        const unit = new Unit(
+            `${card.name} Lv${card.level}`,
+            x, y,
+            0, // team = 0（玩家方）
+            card.unitType,
+            maxHp, atk, speed
+        );
+        
+        // 應用英雄專精
+        unit.applySpecialization(card.name);
+        
+        gameState.units.push(unit);
+    });
+    
+    // 切換到遊戲畫面
+    document.getElementById('mainMenu').style.display = 'none';
+    document.getElementById('gameScreen').style.display = 'flex';
+    
+    gameState.lastTime = Date.now();
     requestAnimationFrame(gameLoop);
 }
 
-// 觸控支援
-canvas.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-}, { passive: false });
+// === 遊戲結束 ===
+function endGame(victory) {
+    gameState.running = false;
+    
+    if (victory) {
+        const goldReward = 500 * gameState.wave;
+        const gemReward = 50 + 10 * gameState.wave;
+        
+        player.gold += goldReward;
+        player.gems += gemReward;
+        player.currentChapter = Math.min(player.currentChapter + 1, 3);
+        player.save();
+        
+        alert(`🎉 勝利！\n\n獲得金幣: +${goldReward}\n獲得鑽石: +${gemReward}\n\n推進章節 → 第 ${player.currentChapter} 章`);
+    } else {
+        player.save();
+        alert(`💀 戰敗\n\n堅持到第 ${gameState.wave} 波`);
+    }
+    
+    backToMenu();
+}
 
-// 阻止雙指縮放
-document.addEventListener('gesturestart', (e) => {
-    e.preventDefault();
+// === 返回菜單 ===
+function backToMenu() {
+    gameState.running = false;
+    document.getElementById('gameScreen').style.display = 'none';
+    document.getElementById('mainMenu').style.display = 'flex';
+}
+
+// === 控制功能 ===
+function toggleAuto() {
+    if (!gameState.running) return;
+    gameState.autoMode = !gameState.autoMode;
+    const btn = document.querySelector('#gameControls button:nth-child(1)');
+    if (btn) {
+        btn.textContent = gameState.autoMode ? '🤖 自動 ON' : '🤖 自動 OFF';
+    }
+}
+
+function changeSpeed() {
+    if (!gameState.running) return;
+    const speeds = [1.0, 1.5, 2.0];
+    const currentIdx = speeds.indexOf(gameState.gameSpeed);
+    gameState.gameSpeed = speeds[(currentIdx + 1) % speeds.length];
+    
+    const btn = document.querySelector('#gameControls button:nth-child(2)');
+    if (btn) {
+        btn.textContent = `⏱️ ${gameState.gameSpeed.toFixed(1)}x`;
+    }
+}
+
+// === 隊伍管理功能 ===
+function showTeam() {
+    const roster = player.roster;
+    if (roster.length === 0) {
+        alert('📭 還沒有英雄，進行 10 連抽獲取！');
+        return;
+    }
+    
+    const cardListText = roster.map((card, i) =>
+        `${i + 1}. ${card.name} Lv${card.level} ${card.stars}⭐ (${card.rarity})`
+    ).join('\n');
+    
+    const currentTeam = player.getTeamCards().map(c => c.name).join(', ') || '(空)';
+    
+    alert(`📚 英雄圖鑑：\n${cardListText}\n\n當前隊伍：${currentTeam}`);
+}
+
+// === 抽卡功能 ===
+function showGacha() {
+    const times = parseInt(prompt('輸入抽卡次數：\n1 = 單抽 (10鑽)\n10 = 十連 (100鑽)', '10'));
+    
+    if (!times || times < 1 || times > 10) {
+        alert('❌ 輸入的次數無效');
+        return;
+    }
+    
+    const cost = times * 10;
+    if (player.gems < cost) {
+        alert(`❌ 鑽石不足！需要 ${cost} 顆鑽石`);
+        return;
+    }
+    
+    const results = player.gacha(times);
+    player.gems -= cost;
+    player.save();
+    
+    const resultText = results
+        .map(r => `✨ ${r.name} (${r.rarity})`)
+        .join('\n');
+    
+    alert(`🎁 抽卡結果：\n${resultText}\n\n當前鑽石: ${player.gems}`);
+}
+
+// === 任務系統 ===
+function showQuests() {
+    const daily = player.dailyQuests
+        .map(q => `✓ ${q.name}: ${q.progress}/${q.target}`)
+        .join('\n');
+    
+    alert(`📋 每日任務：\n${daily}`);
+}
+
+// === 初始化遊戲 ===
+window.addEventListener('DOMContentLoaded', () => {
+    // 載入玩家數據
+    player.load();
+    
+    // 首次遊戲初始化
+    if (player.roster.length === 0) {
+        // 進行首次 10 連抽
+        const results = player.gacha(10);
+        player.team = results.slice(0, 3).map(r => r.id);
+        player.save();
+        
+        alert(`🎬 歡迎遊戲！\n\n首次 10 連抽結果：\n${results.map(r => r.name).join('\n')}`);
+    }
+    
+    console.log('✅ 遊戲已加載完成');
+    console.log('玩家數據:', player);
 });
