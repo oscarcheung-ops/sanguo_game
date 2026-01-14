@@ -86,7 +86,7 @@ function gameLoop(currentTime) {
     // 更新和繪製單位
     gameState.units = gameState.units.filter(u => u.hp > 0);
     gameState.units.forEach(unit => {
-        unit.update(gameState.units, gameState);
+        unit.update(gameState.units, [gameState.playerCastle, gameState.enemyCastle], gameState);
         unit.draw(ctx);
     });
     
