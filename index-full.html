@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>三國戰記 - 完整版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0F1419 0%, #1A1A2E 100%);
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* === 主選單頁面 === */
+        #mainMenu {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0F1419 0%, #2C3E50 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            color: #ECF0F1;
+        }
+
+        .menu-title {
+            font-size: 48px;
+            margin-bottom: 30px;
+            color: #F39C12;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.8);
+            font-weight: bold;
+        }
+
+        .menu-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            max-width: 600px;
+        }
+
+        .menu-btn {
+            background: linear-gradient(145deg, #4A90E2, #357ABD);
+            color: white;
+            border: none;
+            border-radius: 15px;
+            padding: 25px 20px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+
+        .menu-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+        }
+
+        .menu-btn:active {
+            transform: scale(0.98);
+        }
+
+        .menu-btn.new-game { background: linear-gradient(145deg, #2ECC71, #27AE60); }
+        .menu-btn.team { background: linear-gradient(145deg, #9B59B6, #8E44AD); }
+        .menu-btn.gacha { background: linear-gradient(145deg, #E74C3C, #C0392B); }
+        .menu-btn.settings { background: linear-gradient(145deg, #1ABC9C, #16A085); }
+
+        /* === 戰鬥頁面 === */
+        #battleScreen {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+        }
+
+        #gameCanvas {
+            flex: 1;
+            background: linear-gradient(180deg, #0F1419 0%, #1A1A2E 50%, #0F1419 100%);
+            display: block;
+        }
+
+        #topBar {
+            background: rgba(26, 26, 46, 0.95);
+            color: #ECF0F1;
+            padding: 10px 15px;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        .stat-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 12px;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #F39C12;
+        }
+
+        #battleControls {
+            background: rgba(26, 26, 46, 0.95);
+            padding: 15px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+        }
+
+        .battle-btn {
+            background: linear-gradient(145deg, #4A90E2, #357ABD);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .battle-btn:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .battle-btn.auto { background: linear-gradient(145deg, #1ABC9C, #16A085); }
+        .battle-btn.speed { background: linear-gradient(145deg, #F39C12, #D68910); }
+        .battle-btn.ranges { background: linear-gradient(145deg, #9B59B6, #8E44AD); }
+        .battle-btn.back { background: linear-gradient(145deg, #E74C3C, #C0392B); }
+
+        /* === 隊伍編成頁面 === */
+        #teamScreen {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: rgba(26, 26, 46, 0.98);
+            display: none;
+            flex-direction: column;
+            z-index: 900;
+            color: #ECF0F1;
+            overflow-y: auto;
+        }
+
+        .screen-header {
+            background: rgba(44, 62, 80, 0.95);
+            padding: 15px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #F39C12;
+            border-bottom: 2px solid #F39C12;
+        }
+
+        .screen-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .hero-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .hero-card {
+            background: linear-gradient(135deg, #2C3E50 0%, #34495E 100%);
+            border: 2px solid #F39C12;
+            border-radius: 10px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .hero-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(243, 156, 18, 0.3);
+        }
+
+        .hero-card.selected {
+            border-color: #2ECC71;
+            box-shadow: 0 0 10px rgba(46, 204, 113, 0.5);
+        }
+
+        .hero-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #ECF0F1;
+            margin-bottom: 8px;
+        }
+
+        .hero-stats {
+            font-size: 12px;
+            color: #BDC3C7;
+            line-height: 1.6;
+        }
+
+        .screen-footer {
+            padding: 15px;
+            background: rgba(44, 62, 80, 0.95);
+            border-top: 2px solid #F39C12;
+            display: flex;
+            gap: 10px;
+        }
+
+        .footer-btn {
+            flex: 1;
+            background: linear-gradient(145deg, #4A90E2, #357ABD);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .footer-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .footer-btn:active {
+            transform: scale(0.98);
+        }
+
+        .footer-btn.cancel { background: linear-gradient(145deg, #E74C3C, #C0392B); }
+        .footer-btn.confirm { background: linear-gradient(145deg, #2ECC71, #27AE60); }
+
+        /* === 抽卡頁面 === */
+        #gachaScreen {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: rgba(26, 26, 46, 0.98);
+            display: none;
+            flex-direction: column;
+            z-index: 900;
+            color: #ECF0F1;
+        }
+
+        .gacha-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 30px;
+        }
+
+        .gacha-btn {
+            background: linear-gradient(145deg, #F39C12, #D68910);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 20px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            transition: all 0.2s;
+        }
+
+        .gacha-btn:hover {
+            transform: translateY(-3px);
+        }
+
+        .gacha-btn:active {
+            transform: scale(0.98);
+        }
+
+        .gacha-result {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #F39C12;
+        }
+
+        /* === 設置頁面 === */
+        #settingsScreen {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: rgba(26, 26, 46, 0.98);
+            display: none;
+            flex-direction: column;
+            z-index: 900;
+            color: #ECF0F1;
+        }
+
+        .settings-item {
+            padding: 15px;
+            border-bottom: 1px solid #34495E;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .settings-label {
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .settings-value {
+            color: #F39C12;
+            font-weight: bold;
+        }
+
+        /* === 通用樣式 === */
+        .hidden {
+            display: none !important;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .modal-content {
+            background: rgba(44, 62, 80, 0.98);
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 500px;
+            text-align: center;
+            color: #ECF0F1;
+            border: 2px solid #F39C12;
+        }
+
+        .modal-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #F39C12;
+            margin-bottom: 15px;
+        }
+
+        .modal-text {
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .modal-btn {
+            flex: 1;
+            background: linear-gradient(145deg, #4A90E2, #357ABD);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .modal-btn:active {
+            transform: scale(0.98);
+        }
+
+        .modal-btn.confirm { background: linear-gradient(145deg, #2ECC71, #27AE60); }
+        .modal-btn.cancel { background: linear-gradient(145deg, #E74C3C, #C0392B); }
+
+        @media (max-width: 768px) {
+            #topBar {
+                grid-template-columns: repeat(3, 1fr);
+                font-size: 11px;
+            }
+
+            .stat-value {
+                font-size: 16px;
+            }
+
+            .menu-container {
+                grid-template-columns: 1fr;
+                width: 90%;
+            }
+
+            .hero-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <!-- 主選單 -->
+        <div id="mainMenu">
+            <div class="menu-title">🎮 三國戰記</div>
+            <div class="menu-container">
+                <button class="menu-btn new-game" onclick="startNewGame()">
+                    🎯 開始遊戲<br><small>進入戰鬥</small>
+                </button>
+                <button class="menu-btn team" onclick="showTeamScreen()">
+                    👥 隊伍編成<br><small>選擇英雄</small>
+                </button>
+                <button class="menu-btn gacha" onclick="showGachaScreen()">
+                    💎 抽卡獲取<br><small>獲取英雄</small>
+                </button>
+                <button class="menu-btn settings" onclick="showSettingsScreen()">
+                    ⚙️ 設置<br><small>遊戲設定</small>
+                </button>
+            </div>
+        </div>
+
+        <!-- 隊伍編成頁面 -->
+        <div id="teamScreen">
+            <div class="screen-header">👥 隊伍編成</div>
+            <div class="screen-content">
+                <div style="margin-bottom: 20px;">
+                    <h3 style="color: #F39C12; margin-bottom: 10px;">當前隊伍：</h3>
+                    <div id="currentTeam" class="hero-grid"></div>
+                </div>
+                <div>
+                    <h3 style="color: #F39C12; margin-bottom: 10px;">可用英雄：</h3>
+                    <div id="availableHeroes" class="hero-grid"></div>
+                </div>
+            </div>
+            <div class="screen-footer">
+                <button class="footer-btn cancel" onclick="hideTeamScreen()">返回</button>
+                <button class="footer-btn confirm" onclick="confirmTeam()">確認</button>
+            </div>
+        </div>
+
+        <!-- 抽卡頁面 -->
+        <div id="gachaScreen">
+            <div class="screen-header">💎 英雄抽卡</div>
+            <div class="gacha-container">
+                <div style="font-size: 18px; margin-bottom: 20px;">
+                    <p>💰 金幣: <span id="gachGold">100</span></p>
+                    <p>💎 鑽石: <span id="gachGems">100</span></p>
+                </div>
+                <button class="gacha-btn" onclick="gacha(1)">
+                    🎁 單抽 (10 鑽石)
+                </button>
+                <button class="gacha-btn" onclick="gacha(10)">
+                    🎁x10 十連抽 (100 鑽石)
+                </button>
+                <div id="gachaResult" class="gacha-result"></div>
+            </div>
+            <div class="screen-footer">
+                <button class="footer-btn cancel" onclick="hideGachaScreen()" style="flex: 1;">返回</button>
+            </div>
+        </div>
+
+        <!-- 設置頁面 -->
+        <div id="settingsScreen">
+            <div class="screen-header">⚙️ 設置</div>
+            <div class="screen-content">
+                <div class="settings-item">
+                    <span class="settings-label">遊戲版本</span>
+                    <span class="settings-value">v1.0 完整版</span>
+                </div>
+                <div class="settings-item">
+                    <span class="settings-label">當前等級</span>
+                    <span class="settings-value" id="settingsLevel">1</span>
+                </div>
+                <div class="settings-item">
+                    <span class="settings-label">總金幣</span>
+                    <span class="settings-value" id="settingsGold">0</span>
+                </div>
+                <div class="settings-item">
+                    <span class="settings-label">總鑽石</span>
+                    <span class="settings-value" id="settingsGems">100</span>
+                </div>
+                <div class="settings-item">
+                    <span class="settings-label">英雄數量</span>
+                    <span class="settings-value" id="settingsHeroes">0</span>
+                </div>
+                <div class="settings-item">
+                    <span class="settings-label">清除數據</span>
+                    <button class="modal-btn cancel" onclick="clearData()">重置</button>
+                </div>
+            </div>
+            <div class="screen-footer">
+                <button class="footer-btn cancel" onclick="hideSettingsScreen()" style="flex: 1;">返回</button>
+            </div>
+        </div>
+
+        <!-- 戰鬥頁面 -->
+        <div id="battleScreen">
+            <div id="topBar">
+                <div class="stat-box">
+                    <span>玩家城堡</span>
+                    <span class="stat-value" id="playerHP">1000</span>
+                </div>
+                <div class="stat-box">
+                    <span>敵方城堡</span>
+                    <span class="stat-value" id="enemyHP">1000</span>
+                </div>
+                <div class="stat-box">
+                    <span>波數</span>
+                    <span class="stat-value" id="waveNum">1/10</span>
+                </div>
+                <div class="stat-box">
+                    <span>金幣</span>
+                    <span class="stat-value" id="battleGold">0</span>
+                </div>
+                <div class="stat-box">
+                    <span>時間</span>
+                    <span class="stat-value" id="battleTime">0:00</span>
+                </div>
+            </div>
+            <canvas id="gameCanvas"></canvas>
+            <div id="battleControls">
+                <button class="battle-btn auto" id="autoBtn" onclick="toggleAuto()">🤖 自動戰鬥</button>
+                <button class="battle-btn speed" id="speedBtn" onclick="changeSpeed()">⏱️ 1x 速度</button>
+                <button class="battle-btn ranges" onclick="toggleRanges()">📍 顯示範圍</button>
+                <button class="battle-btn back" onclick="backToMenu()">← 返回菜單</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="game-full.js"></script>
+</body>
+</html>
