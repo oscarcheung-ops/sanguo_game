@@ -16,7 +16,22 @@ let gameState = {
     startTime: 0,
     lastTime: 0,
     damageTexts: [],
-    particles: []
+    particles: [],
+    // 波間準備系統
+    waitingForEvent: false,
+    prepCountdown: 0,
+    prepTime: 3,
+    eventChoices: [],
+    // Roguelite 狀態
+    activeBuffs: [],
+    activeCurses: [],
+    critChance: 0,
+    damageReduction: 0,
+    lifestealRate: 0,
+    // 商店狀態
+    shopItems: [],
+    shopLocked: [],
+    refreshCount: 0
 };
 
 // Canvas 設置
@@ -118,20 +133,36 @@ function gameLoop(currentTime) {
         });
     }
     
-    // 敵人生成邏輯
-    if (gameState.units.filter(u => u.team === 1).length < 8) {
-        // 根據波數增加敵人數量
-        const enemyLimit = Math.min(3 + gameState.wave, 8);
-        if (gameState.units.filter(u => u.team === 1).length < enemyLimit && Math.random() < 0.02) {
-            spawnEnemyUnit();
+    // === 波次敵人生成邏輯（按波生成，非持續） ===
+    const currentEnemies = gameState.units.filter(u => u.team === 1 && u.hp > 0);
+    
+    if (currentEnemies.length === 0) {
+        // 檢查是否完成所有波次
+        if (gameState.wave > gameState.maxWaves) {
+            endGame(true);
+            return;
+        }
+        
+        // 如果是第2波或以後，觸發波間準備階段
+        if (gameState.wave > 1 && !gameState.waitingForEvent) {
+            startWavePreparation();
+        } else if (!gameState.waitingForEvent) {
+            // 第一波直接開始
+            spawnWave();
         }
     }
     
-    // 檢查波數完成
-    if (gameState.wave <= gameState.maxWaves && 
-        gameState.units.filter(u => u.team === 1).length === 0 &&
-        gameState.units.filter(u => u.team === 0).length > 0) {
-        gameState.wave++;
+    // 處理波間準備倒計時
+    if (gameState.waitingForEvent) {
+        gameState.prepCountdown -= deltaTime;
+        if (gameState.prepCountdown <= 0) {
+            // 準備時間結束，自動應用第一個事件
+            if (gameState.eventChoices.length > 0) {
+                applyEvent(gameState.eventChoices[0]);
+            }
+            gameState.waitingForEvent = false;
+            spawnWave();
+        }
     }
     
     // 檢查遊戲結束
@@ -174,6 +205,135 @@ function spawnEnemyUnit() {
     gameState.units.push(unit);
 }
 
+// === 按波次生成敵人（根據章節配置） ===
+function spawnWave() {
+    gameState.wave++;  // 先遞增波數
+    
+    const chapterIdx = Math.max(0, Math.min(player.currentChapter - 1, 2));
+    const chapter = CHAPTER_CONFIGS[chapterIdx];
+    
+    const baseHp = chapter.base_hp + (gameState.wave - 2) * 20;  // 調整計算
+    const baseAtk = chapter.base_atk + (gameState.wave - 2) * 3;
+    
+    // 生成3個敵人（槍、騎、弓各1）
+    const types = [0, 1, 2];
+    const xPositions = [canvas.width/2 - 200, canvas.width/2, canvas.width/2 + 200];
+    
+    types.forEach((type, idx) => {
+        const hp = Math.floor(baseHp * (type === 0 ? 0.56 : type === 1 ? 0.7 : 0.49));
+        const atk = Math.floor(baseAtk * 0.7);
+        const speed = 3 + Math.random();
+        
+        const typeNames = ['槍', '騎', '弓'];
+        const unit = new Unit(
+            `敵${typeNames[type]}${gameState.wave}`,
+            xPositions[idx],
+            120,
+            1,
+            type,
+            hp,
+            atk,
+            speed
+        );
+        gameState.units.push(unit);
+    });
+}
+
+// === 開始波間準備階段 ===
+function startWavePreparation() {
+    gameState.waitingForEvent = true;
+    gameState.prepCountdown = gameState.prepTime;
+    
+    // 混合基礎事件、Buff 和 Curse
+    const baseEvents = [...WAVE_EVENTS];
+    const buffOptions = ROGUELITE_BUFFS.slice(0, 2).sort(() => Math.random() - 0.5);
+    const curseOptions = ROGUELITE_CURSES.slice(0, 1).sort(() => Math.random() - 0.5);
+    
+    let allOptions = [...baseEvents, ...buffOptions, ...curseOptions];
+    
+    // 隨機選擇3個事件
+    gameState.eventChoices = [];
+    for (let i = 0; i < 3 && allOptions.length > 0; i++) {
+        const randomIdx = Math.floor(Math.random() * allOptions.length);
+        gameState.eventChoices.push(allOptions[randomIdx]);
+        allOptions.splice(randomIdx, 1);
+    }
+    
+    // 顯示波間準備UI
+    showWavePrepUI();
+}
+
+// === 應用事件效果 ===
+function applyEvent(event) {
+    const effect = event.effect;
+    
+    // 基礎波間事件
+    if (effect === 'heal') {
+        gameState.units.forEach(u => {
+            if (u.team === 0 && u.hp > 0) {
+                u.hp = Math.min(u.maxHp, u.hp + u.maxHp * 0.25);
+            }
+        });
+    } else if (effect === 'curse') {
+        gameState.units.forEach(u => {
+            if (u.team === 1) {
+                u.atk *= 0.8;
+            }
+        });
+    } else if (effect === 'fewer_enemies') {
+        // 標記下波少生成1個敵人（在 spawnWave 中處理）
+        gameState.fewerEnemies = true;
+    } else if (effect === 'slow') {
+        gameState.units.forEach(u => {
+            u.speed *= 0.7;
+        });
+    }
+    
+    // Roguelite Buff 效果
+    if (event.type === 'buff') {
+        gameState.activeBuffs.push(event.name);
+        
+        if (effect === 'atk_speed') {
+            gameState.units.forEach(u => {
+                if (u.team === 0) u.attackInterval *= 0.7;
+            });
+        } else if (effect === 'crit') {
+            gameState.critChance = 0.25;
+        } else if (effect === 'move_speed') {
+            gameState.units.forEach(u => {
+                if (u.team === 0) u.speed *= 1.4;
+            });
+        } else if (effect === 'lifesteal') {
+            gameState.lifestealRate = 0.15;
+        } else if (effect === 'armor') {
+            gameState.damageReduction = 0.25;
+        } else if (effect === 'cooldown') {
+            gameState.units.forEach(u => {
+                if (u.team === 0 && u.skill) {
+                    u.skill.cooldown *= 0.6;
+                }
+            });
+        }
+    }
+    
+    // Roguelite Curse 效果
+    if (event.type === 'curse') {
+        gameState.activeCurses.push(event.name);
+        
+        if (effect === 'weakness') {
+            gameState.units.forEach(u => {
+                if (u.team === 0) u.atk *= 0.7;
+            });
+        } else if (effect === 'curse_slow') {
+            gameState.units.forEach(u => {
+                if (u.team === 0) u.speed *= 0.5;
+            });
+        } else if (effect === 'curse_fragile') {
+            gameState.damageReduction = -0.4;
+        }
+    }
+}
+
 // === 開始遊戲 ===
 function startGame() {
     const teamCards = player.getTeamCards();
@@ -206,6 +366,15 @@ function startGame() {
     gameState.lastTime = Date.now();
     gameState.damageTexts = [];
     gameState.particles = [];
+    // 初始化波間準備系統
+    gameState.waitingForEvent = false;
+    gameState.prepCountdown = 0;
+    gameState.eventChoices = [];
+    gameState.activeBuffs = [];
+    gameState.activeCurses = [];
+    gameState.critChance = 0;
+    gameState.damageReduction = 0;
+    gameState.lifestealRate = 0;
     
     // 創建玩家單位（隊伍中的英雄）
     teamCards.forEach((card, idx) => {
@@ -388,4 +557,190 @@ function updateMenuResources() {
     const gemsElem = document.getElementById('menuGems');
     if (goldElem) goldElem.textContent = `💰 金幣: ${player.gold}`;
     if (gemsElem) gemsElem.textContent = `💎 鑽石: ${player.gems}`;
+}
+
+// === 波間準備UI顯示 ===
+function showWavePrepUI() {
+    const overlay = document.getElementById('wavePrepOverlay');
+    const prepButtons = document.getElementById('prepButtons');
+    const prepStatus = document.getElementById('prepStatus');
+    
+    if (!overlay || !prepButtons) return;
+    
+    // 顯示浮層
+    overlay.style.display = 'flex';
+    
+    // 更新狀態顯示
+    prepStatus.textContent = `✨ 增益: ${gameState.activeBuffs.length} | 💀 詛咒: ${gameState.activeCurses.length}`;
+    
+    // 清空並生成事件按鈕
+    prepButtons.innerHTML = '';
+    gameState.eventChoices.forEach((event, idx) => {
+        const button = document.createElement('button');
+        button.className = event.type === 'curse' ? 'event-btn curse' : 'event-btn';
+        
+        const icon = event.type === 'buff' ? '✨' : event.type === 'curse' ? '💀' : '⚔';
+        button.textContent = `${icon} ${event.name} - ${event.desc}`;
+        
+        button.onclick = () => {
+            applyEvent(event);
+            hideWavePrepUI();
+            spawnWave();
+        };
+        
+        prepButtons.appendChild(button);
+    });
+    
+    // 啟動倒計時更新
+    updatePrepCountdown();
+}
+
+function updatePrepCountdown() {
+    const countdownElem = document.getElementById('prepCountdownText');
+    if (countdownElem && gameState.waitingForEvent) {
+        countdownElem.textContent = Math.max(0, Math.ceil(gameState.prepCountdown));
+        setTimeout(updatePrepCountdown, 100);
+    }
+}
+
+function hideWavePrepUI() {
+    const overlay = document.getElementById('wavePrepOverlay');
+    if (overlay) {
+        overlay.style.display = 'none';
+    }
+}
+
+// === 商店系統 ===
+function openShop() {
+    const shopHtml = `
+        <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                    background: rgba(0,0,0,0.9); z-index: 1000; display: flex; 
+                    justify-content: center; align-items: center;" id="shopModal">
+            <div style="background: linear-gradient(135deg, #1A1A2E, #16213E); 
+                        border-radius: 20px; padding: 30px; max-width: 500px; max-height: 80vh; 
+                        overflow-y: auto;">
+                <h2 style="color: #F39C12; text-align: center; margin-bottom: 20px;">🏪 戰鬥商店</h2>
+                <p style="color: #BDC3C7; text-align: center; margin-bottom: 20px;">
+                    💰 金幣: ${player.gold}
+                </p>
+                <div id="shopItemsContainer">
+                    ${generateShopItems()}
+                </div>
+                <button onclick="closeShop()" 
+                        style="width: 100%; padding: 15px; background: #E74C3C; color: white; 
+                               border: none; border-radius: 10px; font-size: 16px; font-weight: bold; 
+                               cursor: pointer; margin-top: 20px;">
+                    關閉
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', shopHtml);
+}
+
+function generateShopItems() {
+    // 獲取 SHOP_ITEMS（確保從 config.js 導入）
+    const items = typeof SHOP_ITEMS !== 'undefined' ? SHOP_ITEMS : [];
+    
+    if (items.length === 0) {
+        return '<p style="color: #BDC3C7; text-align: center;">商店暫時無貨</p>';
+    }
+    
+    return items.slice(0, 5).map((item, idx) => {
+        const canAfford = player.gold >= item.cost;
+        const btnColor = canAfford ? '#2ECC71' : '#95A5A6';
+        
+        return `
+            <div style="background: rgba(255,255,255,0.1); border-radius: 10px; 
+                        padding: 15px; margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="color: #ECF0F1; font-size: 18px; font-weight: bold;">
+                            ${item.icon} ${item.name}
+                        </div>
+                        <div style="color: #BDC3C7; font-size: 14px; margin-top: 5px;">
+                            ${item.desc}
+                        </div>
+                        <div style="color: #F39C12; font-size: 16px; font-weight: bold; margin-top: 8px;">
+                            ${item.cost} 金幣
+                        </div>
+                    </div>
+                    <button onclick="buyShopItem(${idx})" 
+                            style="padding: 10px 20px; background: ${btnColor}; color: white; 
+                                   border: none; border-radius: 8px; font-size: 14px; font-weight: bold; 
+                                   cursor: ${canAfford ? 'pointer' : 'not-allowed'};"
+                            ${canAfford ? '' : 'disabled'}>
+                        購買
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function buyShopItem(idx) {
+    const items = typeof SHOP_ITEMS !== 'undefined' ? SHOP_ITEMS : [];
+    if (idx < 0 || idx >= items.length) return;
+    
+    const item = items[idx];
+    if (player.gold < item.cost) {
+        alert('❌ 金幣不足！');
+        return;
+    }
+    
+    player.gold -= item.cost;
+    player.save();
+    
+    // 應用商店物品效果
+    useShopItem(item);
+    
+    // 重新渲染商店
+    closeShop();
+    openShop();
+}
+
+function useShopItem(item) {
+    const effect = item.effect;
+    
+    if (effect === 'heal') {
+        gameState.units.forEach(u => {
+            if (u.team === 0 && u.hp > 0) {
+                u.hp = Math.min(u.maxHp, u.hp + item.value);
+            }
+        });
+        alert(`✅ 恢復了 ${item.value} HP`);
+    } else if (effect === 'atk_boost') {
+        gameState.units.forEach(u => {
+            if (u.team === 0) {
+                u.atk = Math.floor(u.atk * (1 + item.value));
+            }
+        });
+        alert(`✅ 攻擊力提升 ${Math.floor(item.value * 100)}%`);
+    } else if (effect === 'def_boost') {
+        gameState.damageReduction += item.value;
+        alert(`✅ 傷害減免提升 ${Math.floor(item.value * 100)}%`);
+    } else if (effect === 'speed_boost') {
+        gameState.units.forEach(u => {
+            if (u.team === 0) {
+                u.speed *= (1 + item.value);
+            }
+        });
+        alert(`✅ 移動速度提升 ${Math.floor(item.value * 100)}%`);
+    } else if (effect === 'super_potion') {
+        gameState.units.forEach(u => {
+            if (u.team === 0 && u.hp > 0) {
+                u.hp = Math.min(u.maxHp, u.hp + item.value);
+                u.atk = Math.floor(u.atk * 1.3);
+            }
+        });
+        alert(`✅ HP+${item.value}，攻擊力+30%`);
+    }
+}
+
+function closeShop() {
+    const modal = document.getElementById('shopModal');
+    if (modal) {
+        modal.remove();
+    }
 }

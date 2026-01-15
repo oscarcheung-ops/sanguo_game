@@ -150,6 +150,100 @@
         .hidden {
             display: none !important;
         }
+        
+        /* === 波間準備浮層 === */
+        #wavePrepOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 500;
+        }
+        
+        .prep-container {
+            background: linear-gradient(135deg, #1A1A2E, #16213E);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.8);
+            text-align: center;
+        }
+        
+        .prep-title {
+            font-size: 32px;
+            color: #F39C12;
+            margin-bottom: 20px;
+        }
+        
+        .prep-countdown {
+            font-size: 64px;
+            color: #E74C3C;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        
+        .prep-status {
+            font-size: 18px;
+            color: #BDC3C7;
+            margin: 15px 0;
+        }
+        
+        .prep-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin: 30px 0;
+        }
+        
+        .event-btn {
+            background: linear-gradient(145deg, #2ECC71, #27AE60);
+            color: white;
+            border: 3px solid #1ABC9C;
+            border-radius: 10px;
+            padding: 15px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: left;
+        }
+        
+        .event-btn:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 20px rgba(46, 204, 113, 0.5);
+        }
+        
+        .event-btn.curse {
+            background: linear-gradient(145deg, #E74C3C, #C0392B);
+            border-color: #E67E22;
+        }
+        
+        .event-btn.curse:hover {
+            box-shadow: 0 5px 20px rgba(231, 76, 60, 0.5);
+        }
+        
+        .shop-btn {
+            background: linear-gradient(145deg, #3498DB, #2980B9);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s;
+        }
+        
+        .shop-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(52, 152, 219, 0.6);
+        }
 
         @media (max-width: 768px) {
             .menu-buttons {
@@ -220,6 +314,22 @@
                 </div>
             </div>
             <canvas id="gameCanvas"></canvas>
+            
+            <!-- 波間準備浮層 -->
+            <div id="wavePrepOverlay" style="display: none;">
+                <div class="prep-container">
+                    <h2 class="prep-title">⏳ 準備中...</h2>
+                    <div class="prep-countdown" id="prepCountdownText">3</div>
+                    <div class="prep-status" id="prepStatus">
+                        ✨ 增益: 0 | 💀 詛咒: 0
+                    </div>
+                    <div class="prep-buttons" id="prepButtons">
+                        <!-- 動態生成事件選擇按鈕 -->
+                    </div>
+                    <button class="shop-btn" onclick="openShop()">🏪 商店</button>
+                </div>
+            </div>
+            
             <div id="gameControls">
                 <button class="control-btn" onclick="toggleAuto()">🤖 自動戰鬥</button>
                 <button class="control-btn" onclick="changeSpeed()">⏱️ 1.0x</button>

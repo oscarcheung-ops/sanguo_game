@@ -443,3 +443,13 @@ function chooseWeighted(options) {
     
     return options[options.length - 1][0];
 }
+
+// === 戰鬥商店系統 ===
+const SHOP_ITEMS = [
+    { name: "迅速恢復藥", desc: "恢復150 HP", cost: 80, effect: "heal", value: 150, icon: "💊" },
+    { name: "傷害藥劑", desc: "攻擊力+20%", cost: 120, effect: "atk_boost", value: 0.2, icon: "⚡", duration: 30 },
+    { name: "防護符", desc: "傷害減免15%", cost: 100, effect: "def_boost", value: 0.15, icon: "🛡️", duration: 30 },
+    { name: "速度靴", desc: "移動速度+30%", cost: 110, effect: "speed_boost", value: 0.3, icon: "👢", duration: 30 },
+    { name: "中等恢復", desc: "恢復250 HP", cost: 150, effect: "heal", value: 250, icon: "💊" },
+    { name: "強力合劑", desc: "HP+100, ATK+30%", cost: 200, effect: "super_potion", value: 100, icon: "🔥" },
+];
