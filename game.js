@@ -38,6 +38,69 @@ let gameState = {
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+// === 滑鼠事件處理 ===
+let selectedUnit = null;
+
+canvas.addEventListener('click', (event) => {
+    if (!gameState.running || gameState.waitingForEvent) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    
+    // 查找被點擊的玩家單位
+    const playerUnits = gameState.units.filter(u => u.team === 0 && u.hp > 0);
+    playerUnits.forEach(unit => {
+        const dist = Math.hypot(mouseX - unit.pos[0], mouseY - unit.pos[1]);
+        if (dist < 30) {
+            selectedUnit = unit;
+            unit.selected = true;
+        } else {
+            unit.selected = false;
+        }
+    });
+});
+
+canvas.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    if (!gameState.running || !selectedUnit || gameState.waitingForEvent) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    
+    // 查找敵人單位作為攻擊目標
+    const enemyUnits = gameState.units.filter(u => u.team === 1 && u.hp > 0);
+    let targetFound = false;
+    
+    enemyUnits.forEach(unit => {
+        const dist = Math.hypot(mouseX - unit.pos[0], mouseY - unit.pos[1]);
+        if (dist < 30) {
+            selectedUnit.targetEnemy = unit;
+            selectedUnit.targetPos = null;
+            targetFound = true;
+        }
+    });
+    
+    if (!targetFound) {
+        selectedUnit.targetEnemy = null;
+    }
+});
+
+canvas.addEventListener('mouseup', (event) => {
+    if (!gameState.running || !selectedUnit || gameState.waitingForEvent) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    
+    // 設置移動目標
+    selectedUnit.targetPos = [mouseX, mouseY];
+    selectedUnit = null;
+});
+
+// Canvas 設置
+
 // 根據窗口大小調整 canvas
 function resizeCanvas() {
     const gameScreen = document.getElementById('gameScreen');
